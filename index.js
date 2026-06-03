@@ -19,9 +19,13 @@ mongoose
     .catch((err) => {
         console.error('MongoDB connection error:', err.message);
         process.exit(1);
+
     });
 
 const Product = require('./models/Product');
+const { protect, adminAuth } = require('./middleware/auth');
+const authRoutes = require('./routes/auth');
+const adminRoutes = require('./routes/admin');
 
 app.get('/', (req, res) => {
     res.json({ status: 'ok', message: 'Server is running', db: mongoose.connection.readyState });
@@ -32,11 +36,17 @@ app.get('/products', async (req, res) => {
     res.json(products);
 });
 
-app.post('/products', async (req, res) => {
+app.post('/products', protect, adminAuth, async (req, res) => {
     const product = new Product(req.body);
     await product.save();
     res.status(201).json(product);
 });
+
+// Auth routes
+app.use('/api/auth', authRoutes);
+
+// Admin routes
+app.use('/api/admin', adminRoutes);
 
 app.listen(port, () => {
     console.log(`Server is running at http://localhost:${port}`);
