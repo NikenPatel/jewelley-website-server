@@ -26,6 +26,7 @@ const Product = require('./models/Product');
 const { protect, adminAuth } = require('./middleware/auth');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
+const productRoutes = require('./routes/productRoutes');
 
 app.get('/', (req, res) => {
     res.json({ status: 'ok', message: 'Server is running', db: mongoose.connection.readyState });
@@ -41,12 +42,16 @@ app.post('/products', protect, adminAuth, async (req, res) => {
     await product.save();
     res.status(201).json(product);
 });
+app.use("/uploads", express.static("uploads"));
+
+app.use("/api/products", productRoutes);
 
 // Auth routes
 app.use('/api/auth', authRoutes);
 
 // Admin routes
 app.use('/api/admin', adminRoutes);
+
 
 app.listen(port, () => {
     console.log(`Server is running at http://localhost:${port}`);
