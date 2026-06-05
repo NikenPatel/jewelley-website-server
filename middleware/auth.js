@@ -3,11 +3,8 @@ const { verifyToken } = require("../utils/jwt");
 
 const getBearerToken = (req) => {
     const header = req.headers.authorization || "";
-    if (!header.startsWith("Bearer ")) {
-        return null;
-    }
-
-    return header.slice(7);
+    const match = header.match(/^\s*Bearer\s+(.+)$/i);
+    return match ? match[1].trim() : null;
 };
 
 const protect = async (req, res, next) => {

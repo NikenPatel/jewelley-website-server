@@ -27,6 +27,7 @@ const { protect, adminAuth } = require('./middleware/auth');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const productRoutes = require('./routes/productRoutes');
+const categoryRoutes = require('./routes/categoryRoutes');
 
 app.get('/', (req, res) => {
     res.json({ status: 'ok', message: 'Server is running', db: mongoose.connection.readyState });
@@ -51,6 +52,9 @@ app.use('/api/auth', authRoutes);
 
 // Admin routes
 app.use('/api/admin', adminRoutes);
+
+// Category routes
+app.use('/api/categories', categoryRoutes);
 
 
 app.listen(port, () => {
