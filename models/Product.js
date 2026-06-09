@@ -139,6 +139,7 @@ const productSchema = new mongoose.Schema(
         variants: {
             type: [variantSchema],
             default: [],
+            require: true,
         },
 
         customizationOptions: {
