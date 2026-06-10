@@ -29,7 +29,8 @@ const adminRoutes = require('./routes/admin');
 const productRoutes = require('./routes/productRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const cartRoutes = require('./routes/cartRoutes');
-const wishlistRoutes = require('./routes/wishlistRoutes')
+const wishlistRoutes = require('./routes/wishlistRoutes');
+const orderRoutes = require('./routes/orderRoutes');
 
 app.get('/', (req, res) => {
     res.json({ status: 'ok', message: 'Server is running', db: mongoose.connection.readyState });
@@ -63,6 +64,9 @@ app.use('/api/cart', cartRoutes);
 
 // wishlist routes
 app.use('/api/wishlist', wishlistRoutes)
+
+// Order routes
+app.use('/api/orders', orderRoutes);
 
 app.listen(port, () => {
     console.log(`Server is running at http://localhost:${port}`);
