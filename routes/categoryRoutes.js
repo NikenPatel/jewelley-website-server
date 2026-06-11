@@ -17,6 +17,17 @@ const {
     deleteSubCategory,
 } = require("../controllers/subcategoryController");
 
+// ===== SUBCATEGORY ROUTES =====
+
+// Public routes
+router.get("/subcategories", getAllSubCategories);
+router.get("/subcategories/:id", getSubCategoryById);
+
+// Protected admin routes
+router.post("/subcategories", protect, adminAuth, addSubCategory);
+router.put("/subcategories/:id", protect, adminAuth, updateSubCategory);
+router.delete("/subcategories/:id", protect, adminAuth, deleteSubCategory);
+
 // ===== CATEGORY ROUTES =====
 
 // Public routes
@@ -32,7 +43,7 @@ router.post("/", protect, adminAuth, addCategory);
 // ===== SUBCATEGORY ROUTES =====
 
 // Public routes
-router.get("/subcategories/all", getAllSubCategories);
+router.get("/subcategories", getAllSubCategories);
 router.get("/subcategories/:id", getSubCategoryById);
 router.get("/:categoryId/subcategories", getSubCategoriesByCategory);
 
