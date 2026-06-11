@@ -394,7 +394,7 @@ exports.getAllOrders = async (req, res) => {
 exports.updateOrderStatus = async (req, res) => {
     try {
         const orderId = req.params.id;
-        const { orderStatus, paymentStatus } = req.body;
+        const { orderStatus, paymentStatus, rtoReason } = req.body;
 
         const order = await Order.findById(orderId);
 
@@ -408,7 +408,18 @@ exports.updateOrderStatus = async (req, res) => {
         const oldStatus = order.orderStatus;
 
         if (orderStatus) {
-            const validOrderStatuses = ["placed", "confirmed", "processing", "shipped", "delivered", "cancelled"];
+            const validOrderStatuses = [
+                "placed",
+                "confirmed",
+                "processing",
+                "shipped",
+                "delivered",
+                "cancelled",
+                "return_requested",
+                "returned",
+                "return_rejected",
+                "rto",
+            ];
             if (!validOrderStatuses.includes(orderStatus)) {
                 return res.status(400).json({
                     success: false,
@@ -416,8 +427,12 @@ exports.updateOrderStatus = async (req, res) => {
                 });
             }
 
-            // Restore stock if changing to cancelled
-            if (orderStatus === "cancelled" && oldStatus !== "cancelled") {
+            const stockRestoringStatuses = ["cancelled", "returned", "rto"];
+            const isOldRestored = stockRestoringStatuses.includes(oldStatus);
+            const isNewRestored = stockRestoringStatuses.includes(orderStatus);
+
+            // Restore stock if changing to a stock-restoring status
+            if (isNewRestored && !isOldRestored) {
                 const product = await Product.findById(order.product);
                 if (product) {
                     const variant = product.variants.find((v) => v.variantId === order.variantId);
@@ -428,8 +443,8 @@ exports.updateOrderStatus = async (req, res) => {
                     }
                 }
             }
-            // Deduct stock if restoring a cancelled order to an active status
-            else if (oldStatus === "cancelled" && orderStatus !== "cancelled") {
+            // Deduct stock if restoring from a stock-restoring status to an active status
+            else if (!isNewRestored && isOldRestored) {
                 const product = await Product.findById(order.product);
                 if (product) {
                     const variant = product.variants.find((v) => v.variantId === order.variantId);
@@ -445,6 +460,10 @@ exports.updateOrderStatus = async (req, res) => {
                         await product.save();
                     }
                 }
+            }
+
+            if (orderStatus === "rto" && rtoReason) {
+                order.rtoReason = rtoReason;
             }
 
             order.orderStatus = orderStatus;
@@ -466,6 +485,62 @@ exports.updateOrderStatus = async (req, res) => {
         res.status(200).json({
             success: true,
             message: "Order status updated successfully",
+            order,
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message,
+        });
+    }
+};
+
+// Request return (Customer)
+exports.requestReturn = async (req, res) => {
+    try {
+        const orderId = req.params.id;
+        const userId = req.user.id;
+        const { returnReason } = req.body;
+
+        if (!returnReason || !returnReason.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: "Return reason is required",
+            });
+        }
+
+        const order = await Order.findById(orderId);
+
+        if (!order) {
+            return res.status(404).json({
+                success: false,
+                message: "Order not found",
+            });
+        }
+
+        // Check ownership
+        if (order.user.toString() !== userId) {
+            return res.status(403).json({
+                success: false,
+                message: "Forbidden: You cannot request return for another user's order",
+            });
+        }
+
+        // Validate current order status (only delivered orders can be returned)
+        if (order.orderStatus !== "delivered") {
+            return res.status(400).json({
+                success: false,
+                message: `Only delivered orders can be returned. Current status is: ${order.orderStatus}`,
+            });
+        }
+
+        order.orderStatus = "return_requested";
+        order.returnReason = returnReason;
+        await order.save();
+
+        res.status(200).json({
+            success: true,
+            message: "Return request submitted successfully",
             order,
         });
     } catch (error) {

@@ -7,6 +7,7 @@ const {
     getMyOrders,
     getOrderById,
     cancelOrder,
+    requestReturn,
 } = require("../controllers/orderController");
 
 // All user order routes require authentication
@@ -26,5 +27,8 @@ router.get("/:id", getOrderById);
 
 // Cancel an order
 router.put("/:id/cancel", cancelOrder);
+
+// Request order return
+router.put("/:id/return", requestReturn);
 
 module.exports = router;

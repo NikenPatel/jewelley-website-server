@@ -80,8 +80,22 @@ const orderSchema = new mongoose.Schema(
                 "shipped",
                 "delivered",
                 "cancelled",
+                "return_requested",
+                "returned",
+                "return_rejected",
+                "rto",
             ],
             default: "placed",
+        },
+
+        returnReason: {
+            type: String,
+            default: "",
+        },
+
+        rtoReason: {
+            type: String,
+            default: "",
         },
     },
     {

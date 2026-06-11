@@ -126,7 +126,7 @@ router.get('/dashboard/stats', async (req, res) => {
 
         // Total Revenue (sum of totalAmount for all non-cancelled orders)
         const revenueResult = await Order.aggregate([
-            { $match: { orderStatus: { $ne: "cancelled" } } },
+            { $match: { orderStatus: { $nin: ["cancelled", "returned", "rto"] } } },
             { $group: { _id: null, totalRevenue: { $sum: "$totalAmount" } } }
         ]);
         const totalRevenue = revenueResult.length > 0 ? revenueResult[0].totalRevenue : 0;
@@ -151,7 +151,7 @@ router.get('/dashboard/stats', async (req, res) => {
         const todaySalesResult = await Order.aggregate([
             {
                 $match: {
-                    orderStatus: { $ne: "cancelled" },
+                    orderStatus: { $nin: ["cancelled", "returned", "rto"] },
                     createdAt: { $gte: startOfToday, $lte: endOfToday }
                 }
             },
@@ -167,7 +167,7 @@ router.get('/dashboard/stats', async (req, res) => {
         const monthlySalesResult = await Order.aggregate([
             {
                 $match: {
-                    orderStatus: { $ne: "cancelled" },
+                    orderStatus: { $nin: ["cancelled", "returned", "rto"] },
                     createdAt: { $gte: startOfMonth, $lte: endOfToday }
                 }
             },
