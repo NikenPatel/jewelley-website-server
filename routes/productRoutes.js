@@ -7,7 +7,7 @@ const {
     getAllProducts,
     getProductById
 } = require("../controllers/productController");
-const upload = require("../middleware/upload");
+const upload = require("../middleware/multer");
 
 router.post("/add-product", upload.array("images", 5), addProduct);
 router.put("/update-product/:id", updateProduct);

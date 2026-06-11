@@ -31,6 +31,7 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const cartRoutes = require('./routes/cartRoutes');
 const wishlistRoutes = require('./routes/wishlistRoutes');
 const orderRoutes = require('./routes/orderRoutes');
+const uploadRoutes = require("./routes/uploadRoutes");
 
 app.get('/', (req, res) => {
     res.json({ status: 'ok', message: 'Server is running', db: mongoose.connection.readyState });
@@ -46,6 +47,8 @@ app.post('/products', protect, adminAuth, async (req, res) => {
     await product.save();
     res.status(201).json(product);
 });
+
+
 app.use("/uploads", express.static("uploads"));
 
 app.use("/api/products", productRoutes);
@@ -67,6 +70,11 @@ app.use('/api/wishlist', wishlistRoutes)
 
 // Order routes
 app.use('/api/orders', orderRoutes);
+
+//upload routes
+app.use("/api/upload", uploadRoutes);
+
+
 
 app.listen(port, () => {
     console.log(`Server is running at http://localhost:${port}`);
