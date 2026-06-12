@@ -74,6 +74,8 @@ app.use('/api/orders', orderRoutes);
 //upload routes
 app.use("/api/upload", uploadRoutes);
 
+//payment routes
+app.use("/api/payment", require("./routes/paymentRoutes"));
 
 
 app.listen(port, () => {

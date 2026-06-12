@@ -2,6 +2,12 @@ const Product = require("../models/Product");
 const Order = require("../models/Order");
 const User = require("../models/User");
 const Cart = require("../models/Cart");
+const Razorpay = require("razorpay");
+
+const razorpay = new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
 
 // Place order directly (Buy Now)
 exports.buyNow = async (req, res) => {
@@ -70,6 +76,19 @@ exports.buyNow = async (req, res) => {
 
         const totalAmount = price * quantity;
 
+        let razorpayOrder = null;
+        let razorpayOrderId = "";
+
+        if (paymentMethod === "ONLINE") {
+            const options = {
+                amount: totalAmount * 100, // amount in smallest currency unit
+                currency: "INR",
+                receipt: `receipt_buyNow_${Date.now()}`,
+            };
+            razorpayOrder = await razorpay.orders.create(options);
+            razorpayOrderId = razorpayOrder.id;
+        }
+
         const order = await Order.create({
             user: userId,
             product: product._id,
@@ -98,7 +117,8 @@ exports.buyNow = async (req, res) => {
             },
             totalAmount,
             paymentMethod,
-            paymentStatus: paymentMethod === "COD" ? "pending" : "paid",
+            paymentStatus: "pending",
+            razorpayOrderId,
         });
 
         // Update variant stock and product sales
@@ -110,6 +130,7 @@ exports.buyNow = async (req, res) => {
             success: true,
             message: "Order placed successfully",
             order,
+            razorpayOrder,
         });
     } catch (error) {
         console.error(error);
@@ -180,6 +201,24 @@ exports.placeOrderFromCart = async (req, res) => {
             }
         }
 
+        let totalCartAmount = 0;
+        for (const item of cart.items) {
+            totalCartAmount += item.price * item.quantity;
+        }
+
+        let razorpayOrder = null;
+        let razorpayOrderId = "";
+
+        if (paymentMethod === "ONLINE") {
+            const options = {
+                amount: totalCartAmount * 100,
+                currency: "INR",
+                receipt: `receipt_cart_${Date.now()}`,
+            };
+            razorpayOrder = await razorpay.orders.create(options);
+            razorpayOrderId = razorpayOrder.id;
+        }
+
         const createdOrders = [];
 
         // Place order for each item in the cart
@@ -223,7 +262,8 @@ exports.placeOrderFromCart = async (req, res) => {
                 },
                 totalAmount,
                 paymentMethod,
-                paymentStatus: paymentMethod === "COD" ? "pending" : "paid",
+                paymentStatus: "pending",
+                razorpayOrderId,
             });
 
             // Update stock and total sales
@@ -242,6 +282,7 @@ exports.placeOrderFromCart = async (req, res) => {
             success: true,
             message: "Order placed successfully from cart",
             orders: createdOrders,
+            razorpayOrder,
         });
     } catch (error) {
         console.error(error);

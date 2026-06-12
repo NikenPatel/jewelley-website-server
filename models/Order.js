@@ -59,18 +59,37 @@ const orderSchema = new mongoose.Schema(
             required: true,
         },
 
+        // PAYMENT METHOD
         paymentMethod: {
             type: String,
             enum: ["COD", "ONLINE"],
             default: "COD",
         },
 
+        // PAYMENT STATUS
         paymentStatus: {
             type: String,
             enum: ["pending", "paid", "failed"],
             default: "pending",
         },
 
+        // RAZORPAY FIELDS
+        razorpayOrderId: {
+            type: String,
+            default: "",
+        },
+
+        razorpayPaymentId: {
+            type: String,
+            default: "",
+        },
+
+        razorpaySignature: {
+            type: String,
+            default: "",
+        },
+
+        // ORDER STATUS
         orderStatus: {
             type: String,
             enum: [
@@ -88,6 +107,7 @@ const orderSchema = new mongoose.Schema(
             default: "placed",
         },
 
+        // RETURN / RTO
         returnReason: {
             type: String,
             default: "",
@@ -96,6 +116,23 @@ const orderSchema = new mongoose.Schema(
         rtoReason: {
             type: String,
             default: "",
+        },
+
+        // OPTIONAL PAYMENT DETAILS
+        paymentDetails: {
+            paymentGateway: {
+                type: String,
+                default: "Razorpay",
+            },
+
+            currency: {
+                type: String,
+                default: "INR",
+            },
+
+            paidAt: {
+                type: Date,
+            },
         },
     },
     {
