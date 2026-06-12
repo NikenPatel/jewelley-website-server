@@ -2,6 +2,7 @@ const Product = require("../models/Product");
 const Order = require("../models/Order");
 const User = require("../models/User");
 const Cart = require("../models/Cart");
+const Coupon = require("../models/Coupon");
 const Razorpay = require("razorpay");
 
 const razorpay = new Razorpay({
@@ -20,6 +21,7 @@ exports.buyNow = async (req, res) => {
             ringSize,
             engravingText,
             paymentMethod,
+            couponCode,
         } = req.body;
 
         const userId = req.user.id;
@@ -74,14 +76,77 @@ exports.buyNow = async (req, res) => {
                 ? variant.discountPrice
                 : variant.price;
 
-        const totalAmount = price * quantity;
+        const subtotal = price * quantity;
+        let discountAmount = 0;
+        let couponDoc = null;
+
+        if (couponCode) {
+            couponDoc = await Coupon.findOne({ code: couponCode.toUpperCase() });
+            if (!couponDoc) {
+                return res.status(400).json({ success: false, message: "Invalid coupon code" });
+            }
+            const validity = couponDoc.isValid();
+            if (!validity.valid) {
+                return res.status(400).json({ success: false, message: validity.message });
+            }
+
+            if (couponDoc.applicableUsers && couponDoc.applicableUsers.length > 0) {
+                if (!couponDoc.applicableUsers.includes(userId)) {
+                    return res.status(400).json({ success: false, message: "This coupon is not valid for your account." });
+                }
+            }
+
+            if (couponDoc.isFirstOrderOnly) {
+                const previousOrderCount = await Order.countDocuments({ user: userId });
+                if (previousOrderCount > 0) {
+                    return res.status(400).json({ success: false, message: "This coupon is valid for first-time orders only." });
+                }
+            }
+
+            // Check product/category applicability
+            const hasProductRestrictions = couponDoc.applicableProducts && couponDoc.applicableProducts.length > 0;
+            const hasCategoryRestrictions = couponDoc.applicableCategories && couponDoc.applicableCategories.length > 0;
+            
+            let isApplicable = true;
+            if (hasProductRestrictions || hasCategoryRestrictions) {
+                isApplicable = false;
+                if (hasProductRestrictions && couponDoc.applicableProducts.includes(product._id)) {
+                    isApplicable = true;
+                }
+                if (hasCategoryRestrictions && couponDoc.applicableCategories.includes(product.category)) {
+                    isApplicable = true;
+                }
+            }
+
+            if (!isApplicable) {
+                return res.status(400).json({ success: false, message: "Coupon is not applicable to this product" });
+            }
+
+            if (subtotal < couponDoc.minOrderAmount) {
+                return res.status(400).json({ success: false, message: `Minimum amount for this coupon is ₹${couponDoc.minOrderAmount}` });
+            }
+
+            if (couponDoc.discountType === 'percentage') {
+                discountAmount = subtotal * (couponDoc.discountValue / 100);
+                if (couponDoc.maxDiscount && discountAmount > couponDoc.maxDiscount) {
+                    discountAmount = couponDoc.maxDiscount;
+                }
+            } else if (couponDoc.discountType === 'fixed') {
+                discountAmount = couponDoc.discountValue;
+            }
+            discountAmount = Math.min(discountAmount, subtotal);
+        }
+
+        const discountedSubtotal = Math.max(0, subtotal - discountAmount);
+        const gstAmount = discountedSubtotal * 0.03;
+        const totalAmount = discountedSubtotal + gstAmount;
 
         let razorpayOrder = null;
         let razorpayOrderId = "";
 
         if (paymentMethod === "ONLINE") {
             const options = {
-                amount: totalAmount * 100, // amount in smallest currency unit
+                amount: Math.round(totalAmount * 100), // amount in smallest currency unit
                 currency: "INR",
                 receipt: `receipt_buyNow_${Date.now()}`,
             };
@@ -121,10 +186,18 @@ exports.buyNow = async (req, res) => {
             razorpayOrderId,
         });
 
-        // Update variant stock and product sales
-        variant.stock -= quantity;
-        product.totalSales = (product.totalSales || 0) + quantity;
-        await product.save();
+        // Update variant stock, product sales, and coupon usage ONLY if COD.
+        // For ONLINE, stock is updated upon successful payment verification.
+        if (paymentMethod !== "ONLINE") {
+            variant.stock -= quantity;
+            product.totalSales = (product.totalSales || 0) + quantity;
+            await product.save();
+        }
+
+        if (couponDoc) {
+            couponDoc.usedCount += 1;
+            await couponDoc.save();
+        }
 
         res.status(201).json({
             success: true,
@@ -144,7 +217,7 @@ exports.buyNow = async (req, res) => {
 // Place orders from Cart
 exports.placeOrderFromCart = async (req, res) => {
     try {
-        const { address, paymentMethod } = req.body;
+        const { address, paymentMethod, couponCode } = req.body;
         const userId = req.user.id;
 
         if (!address || !paymentMethod) {
@@ -201,17 +274,90 @@ exports.placeOrderFromCart = async (req, res) => {
             }
         }
 
-        let totalCartAmount = 0;
+        let subtotal = 0;
+        let applicableSubtotal = 0;
         for (const item of cart.items) {
-            totalCartAmount += item.price * item.quantity;
+            subtotal += item.price * item.quantity;
         }
+
+        let discountAmount = 0;
+        let couponDoc = null;
+
+        if (couponCode) {
+            couponDoc = await Coupon.findOne({ code: couponCode.toUpperCase() });
+            if (!couponDoc) {
+                return res.status(400).json({ success: false, message: "Invalid coupon code" });
+            }
+            const validity = couponDoc.isValid();
+            if (!validity.valid) {
+                return res.status(400).json({ success: false, message: validity.message });
+            }
+
+            if (couponDoc.applicableUsers && couponDoc.applicableUsers.length > 0) {
+                if (!couponDoc.applicableUsers.includes(userId)) {
+                    return res.status(400).json({ success: false, message: "This coupon is not valid for your account." });
+                }
+            }
+
+            if (couponDoc.isFirstOrderOnly) {
+                const previousOrderCount = await Order.countDocuments({ user: userId });
+                if (previousOrderCount > 0) {
+                    return res.status(400).json({ success: false, message: "This coupon is valid for first-time orders only." });
+                }
+            }
+
+            // Check which items apply
+            const hasProductRestrictions = couponDoc.applicableProducts && couponDoc.applicableProducts.length > 0;
+            const hasCategoryRestrictions = couponDoc.applicableCategories && couponDoc.applicableCategories.length > 0;
+
+            for (const item of cart.items) {
+                const product = item.productId;
+                if (!product) continue;
+
+                let isApplicable = true;
+                if (hasProductRestrictions || hasCategoryRestrictions) {
+                    isApplicable = false;
+                    if (hasProductRestrictions && couponDoc.applicableProducts.includes(product._id)) {
+                        isApplicable = true;
+                    }
+                    if (hasCategoryRestrictions && couponDoc.applicableCategories.includes(product.category)) {
+                        isApplicable = true;
+                    }
+                }
+                if (isApplicable) {
+                    applicableSubtotal += item.price * item.quantity;
+                }
+            }
+
+            if (applicableSubtotal === 0) {
+                return res.status(400).json({ success: false, message: "Coupon is not applicable to any products in your cart" });
+            }
+
+            if (applicableSubtotal < couponDoc.minOrderAmount) {
+                return res.status(400).json({ success: false, message: `Minimum applicable amount is ₹${couponDoc.minOrderAmount}` });
+            }
+
+            if (couponDoc.discountType === 'percentage') {
+                discountAmount = applicableSubtotal * (couponDoc.discountValue / 100);
+                if (couponDoc.maxDiscount && discountAmount > couponDoc.maxDiscount) {
+                    discountAmount = couponDoc.maxDiscount;
+                }
+            } else if (couponDoc.discountType === 'fixed') {
+                discountAmount = couponDoc.discountValue;
+            }
+            discountAmount = Math.min(discountAmount, applicableSubtotal);
+        }
+
+        const discountedSubtotal = Math.max(0, subtotal - discountAmount);
+        const gstAmount = discountedSubtotal * 0.03;
+        const finalCartAmount = discountedSubtotal + gstAmount;
 
         let razorpayOrder = null;
         let razorpayOrderId = "";
 
         if (paymentMethod === "ONLINE") {
             const options = {
-                amount: totalCartAmount * 100,
+                amount: Math.round(finalCartAmount * 100),
                 currency: "INR",
                 receipt: `receipt_cart_${Date.now()}`,
             };
@@ -232,7 +378,9 @@ exports.placeOrderFromCart = async (req, res) => {
             const ringSize = item.customization?.selectedRingSize || item.customization?.ringSize || null;
             const engravingText = item.customization?.engravingText || "";
 
-            const totalAmount = item.price * quantity;
+            const itemSubtotal = item.price * quantity;
+            const proportion = subtotal > 0 ? (itemSubtotal / subtotal) : 0;
+            const itemFinalAmount = finalCartAmount * proportion;
 
             const order = await Order.create({
                 user: userId,
@@ -260,23 +408,32 @@ exports.placeOrderFromCart = async (req, res) => {
                     price: variant.price,
                     discountPrice: variant.discountPrice,
                 },
-                totalAmount,
+                totalAmount: itemFinalAmount,
                 paymentMethod,
                 paymentStatus: "pending",
                 razorpayOrderId,
             });
 
-            // Update stock and total sales
-            variant.stock -= quantity;
-            product.totalSales = (product.totalSales || 0) + quantity;
-            await product.save();
+            // Update stock and total sales immediately ONLY if COD
+            if (paymentMethod !== "ONLINE") {
+                variant.stock -= quantity;
+                product.totalSales = (product.totalSales || 0) + quantity;
+                await product.save();
+            }
 
             createdOrders.push(order);
         }
 
-        // Clear user's cart
-        cart.items = [];
-        await cart.save();
+        // Clear user's cart ONLY if COD. If ONLINE, clear it after payment verification.
+        if (paymentMethod !== "ONLINE") {
+            cart.items = [];
+            await cart.save();
+        }
+
+        if (couponDoc) {
+            couponDoc.usedCount += 1;
+            await couponDoc.save();
+        }
 
         res.status(201).json({
             success: true,

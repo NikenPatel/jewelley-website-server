@@ -77,6 +77,9 @@ app.use("/api/upload", uploadRoutes);
 //payment routes
 app.use("/api/payment", require("./routes/paymentRoutes"));
 
+// Coupon routes
+app.use("/api/coupons", require("./routes/couponRoutes"));
+
 
 app.listen(port, () => {
     console.log(`Server is running at http://localhost:${port}`);

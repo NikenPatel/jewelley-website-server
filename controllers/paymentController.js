@@ -64,6 +64,7 @@ exports.verifyPayment = async (req, res) => {
             razorpay_order_id,
             razorpay_payment_id,
             razorpay_signature,
+            clearCart,
         } = req.body;
 
         const body =
@@ -96,6 +97,28 @@ exports.verifyPayment = async (req, res) => {
                 razorpaySignature: razorpay_signature,
             }
         );
+
+        // Deduct stock and increment sales for these orders now that payment is verified
+        const orders = await Order.find({ razorpayOrderId: razorpay_order_id });
+        const Product = require("../models/Product");
+        
+        for (const order of orders) {
+            const product = await Product.findById(order.product);
+            if (product) {
+                const variant = product.variants.find((v) => v.variantId === order.variantId);
+                if (variant) {
+                    variant.stock = Math.max(0, variant.stock - order.quantity);
+                }
+                product.totalSales = (product.totalSales || 0) + order.quantity;
+                await product.save();
+            }
+        }
+
+        if (clearCart && orders.length > 0) {
+            const userId = orders[0].user;
+            const Cart = require("../models/Cart");
+            await Cart.findOneAndUpdate({ userId }, { items: [] });
+        }
 
         res.status(200).json({
             success: true,
