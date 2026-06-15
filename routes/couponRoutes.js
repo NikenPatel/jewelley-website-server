@@ -1,13 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const { 
-    createCoupon, 
-    getAllCoupons, 
-    updateCoupon, 
-    deleteCoupon, 
-    validateCoupon 
+const {
+    createCoupon,
+    getAllCoupons,
+    updateCoupon,
+    deleteCoupon,
+    validateCoupon
 } = require('../controllers/couponController');
-const { protect, adminAuth } = require('../middleware/auth');
+const { protect, adminAuth } = require('../middleware/authMiddleware');
 
 // Customer Routes
 router.post('/validate', protect, validateCoupon);

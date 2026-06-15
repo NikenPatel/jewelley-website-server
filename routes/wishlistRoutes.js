@@ -8,7 +8,7 @@ const {
     checkWishlistItem,
 } = require("../controllers/wishlistController");
 
-const { protect } = require("../middleware/auth");
+const { protect } = require("../middleware/authMiddleware");
 
 router.post("/", protect, addToWishlist);
 

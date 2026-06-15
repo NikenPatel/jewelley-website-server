@@ -23,15 +23,16 @@ mongoose
     });
 
 const Product = require('./models/Product');
-const { protect, adminAuth } = require('./middleware/auth');
-const authRoutes = require('./routes/auth');
-const adminRoutes = require('./routes/admin');
+const { protect, adminAuth } = require('./middleware/authMiddleware');
+const authRoutes = require('./routes/authRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 const productRoutes = require('./routes/productRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const cartRoutes = require('./routes/cartRoutes');
 const wishlistRoutes = require('./routes/wishlistRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const uploadRoutes = require("./routes/uploadRoutes");
+const reviewRoutes = require("./routes/reviewRoutes");
 
 app.get('/', (req, res) => {
     res.json({ status: 'ok', message: 'Server is running', db: mongoose.connection.readyState });
@@ -79,6 +80,9 @@ app.use("/api/payment", require("./routes/paymentRoutes"));
 
 // Coupon routes
 app.use("/api/coupons", require("./routes/couponRoutes"));
+
+// Review routes
+app.use("/api/reviews", reviewRoutes);
 
 
 app.listen(port, () => {

@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { protect, adminAuth } = require("../middleware/auth");
+const { protect, adminAuth } = require("../middleware/authMiddleware");
 const {
     addCategory,
     getAllCategories,

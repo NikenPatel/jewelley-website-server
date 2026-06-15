@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { protect, adminAuth } = require('../middleware/auth');
+const { protect, adminAuth } = require('../middleware/authMiddleware');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
 const User = require('../models/User');
@@ -116,7 +116,7 @@ router.delete('/products/:id', async (req, res) => {
 router.get('/dashboard/stats', async (req, res) => {
     try {
         const totalProducts = await Product.countDocuments();
-        
+
         // Total Orders
         const totalOrders = await Order.countDocuments();
 
