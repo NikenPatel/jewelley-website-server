@@ -98,4 +98,38 @@ const me = async (req, res) => {
     });
 };
 
-module.exports = { signup, signin, me };
+const updateProfile = async (req, res) => {
+    try {
+        const { address } = req.body;
+        const user = await User.findById(req.user._id);
+
+        if (!user) {
+            return res.status(404).json({
+                status: "error",
+                message: "User not found"
+            });
+        }
+
+        if (address) {
+            user.address = {
+                ...user.address,
+                ...address
+            };
+        }
+
+        await user.save();
+
+        res.json({
+            status: "ok",
+            message: "Profile updated successfully",
+            user: user.toSafeObject()
+        });
+    } catch (error) {
+        res.status(500).json({
+            status: "error",
+            message: error.message
+        });
+    }
+};
+
+module.exports = { signup, signin, me, updateProfile };
